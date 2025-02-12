@@ -4,6 +4,26 @@ psql -U kol -d gov_contracts
 SELECT * FROM contracts LIMIT 10;    view data
 /Applications/pgAdmin\ 4.app    view with app open 
 \dt
-SELECT * FROM contracts LIMIT 10
+SELECT * FROM contracts LIMIT _
+
+To get contracts limited to 100, we can do random 100 of each page
+API request failures from overload so limited on data I can fetch
+I am fetching the 100 form each month for 2015-2024 so 1200 contracts for each year - about, duplicates cause issue. Randomizing page so there is less duplicate chance
+It is the first 100 contracts from the month so if it is  skewed from that sorry but im going to assume for project purposes it is not
+
+
+YR      # of Contracts
+2015	1797
+2016	1872
+2017	2045
+2018	1748
+2019	1977
+2020	2486
+2021	1618
+2022	1804
+2023	1595
+2024	1733
+
+
 
 

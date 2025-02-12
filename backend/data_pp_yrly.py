@@ -1,27 +1,42 @@
+#reruns the year until the target amount is reached in postgres
 import requests
 import pandas as pd
 import time
+import random
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import text
 from database import SessionLocal, Contract
 
+# 🔽 Change this to fetch contracts for a specific year
+YEAR = 2018 
+TARGET_CONTRACTS = 1800  # Minimum number of contracts we want per year
+
 USA_SPENDING_API_URL = "https://api.usaspending.gov/api/v2/search/spending_by_award/"
 
-def fetch_contracts(year):
-    """Fetch federal contracts from USAspending API by month to ensure 100 unique entries per month."""
+def get_contract_count(year):
+    """Fetches the number of contracts already stored in PostgreSQL for a given year."""
+    with SessionLocal() as session:
+        count_query = session.execute(text(f"""
+            SELECT COUNT(*) FROM contracts WHERE EXTRACT(YEAR FROM start_date) = {year}
+        """))
+        count_result = count_query.fetchone()
+        return count_result[0] if count_result else 0
+
+def fetch_contracts(year, needed_contracts):
+    """Fetch additional contracts from the USAspending API using random pages."""
     headers = {"Content-Type": "application/json"}
     contracts = []
     max_retries = 5
     initial_delay = 5
 
-    for month in range(1, 13):  # Loop through months
-        start_date = f"{year}-{month:02d}-01"
-        if month == 12:
-            end_date = f"{year}-12-31"
-        else:
-            end_date = f"{year}-{month + 1:02d}-01"
+    while needed_contracts > 0:
+        month = random.randint(1, 12)  # Pick a random month
+        page = random.randint(1, 500)  # Pick a random page for variation
 
-        print(f"📡 Fetching contracts for {year}-{month:02d}...")
+        start_date = f"{year}-{month:02d}-01"
+        end_date = f"{year}-{month:02d}-28" if month == 2 else f"{year}-{month:02d}-30"
+
+        print(f"Fetching contracts for {year}-{month:02d}, page {page}...")
 
         params = {
             "filters": {
@@ -35,8 +50,8 @@ def fetch_contracts(year):
                 "NAICS Code", "PSC Code", "Total Outlays", "COVID-19 Obligations",
                 "Awarding Sub Agency", "Funding Sub Agency"
             ],
-            "limit": 100,
-            "page": month  # Fetch different pages for different months
+            "limit": min(needed_contracts, 100),  # Fetch only what's needed up to 100
+            "page": page  # Fetch from a random page
         }
 
         retries = 0
@@ -46,13 +61,13 @@ def fetch_contracts(year):
 
                 if response.status_code == 502:
                     wait_time = initial_delay * (2 ** retries)
-                    print(f"⚠️ API Error 502. Retrying in {wait_time}s...")
+                    print(f"API Error 502. Retrying in {wait_time}s...")
                     time.sleep(wait_time)
                     retries += 1
                     continue
 
                 if response.status_code != 200:
-                    print(f"⚠️ API Error {response.status_code}: {response.text}")
+                    print(f"API Error {response.status_code}: {response.text}")
                     return []
 
                 data = response.json()
@@ -78,39 +93,38 @@ def fetch_contracts(year):
                     }
                     monthly_contracts.append(contract)
 
-                # Remove duplicates within the same month
                 df = pd.DataFrame(monthly_contracts)
                 df = df.drop_duplicates(subset=["contract_id"])
 
-                print(f"{len(df)} unique contracts fetched for {year}-{month:02d}")
+                print(f"{len(df)} unique contracts fetched for {year}-{month:02d} (page {page})")
 
-                contracts.extend(df.to_dict(orient="records"))  # ✅ Append filtered contracts
+                contracts.extend(df.to_dict(orient="records"))  
+                needed_contracts -= len(df)  # Reduce the remaining needed count
                 break  # Exit retry loop if successful
 
             except requests.exceptions.ReadTimeout:
                 wait_time = initial_delay * (2 ** retries)
-                print(f"⚠️ Read Timeout: Retrying in {wait_time}s (attempt {retries + 1}/{max_retries})...")
+                print(f"Read Timeout: Retrying in {wait_time}s (attempt {retries + 1}/{max_retries})...")
                 time.sleep(wait_time)
                 retries += 1
 
             except requests.exceptions.RequestException as e:
-                print(f"⚠️ Network error: {e} (attempt {retries + 1}/{max_retries})")
+                print(f"Network error: {e} (attempt {retries + 1}/{max_retries})")
                 time.sleep(initial_delay * (2 ** retries))
                 retries += 1
 
         else:
             print(f"Skipping {year}-{month:02d} after multiple failures.")
 
-    print(f"Total {len(contracts)} unique contracts fetched for {year}")
     return contracts
 
 def save_to_db(contracts):
     """Saves contracts to PostgreSQL while skipping duplicates."""
-    with SessionLocal() as session:  # Correct session handling
+    with SessionLocal() as session:
         try:
-            inserted_count = 0  # Track inserted records
-            duplicate_count = 0  # Track skipped duplicates
-            skipped_count = 0  # Track missing data
+            inserted_count = 0
+            duplicate_count = 0
+            skipped_count = 0
 
             if not isinstance(contracts, list):
                 print(f"Expected list of contracts but got {type(contracts)}")
@@ -119,43 +133,48 @@ def save_to_db(contracts):
             for contract in contracts:
                 if not isinstance(contract, dict):
                     print(f"Invalid contract format: {contract}")
-                    continue  # Skip invalid contracts
+                    continue
 
-                # Ensure required fields exist
                 if not contract.get("contract_id") or contract.get("award_amount") is None:
                     print(f"Skipping contract due to missing ID or amount: {contract}")
                     skipped_count += 1
                     continue
 
-                # Check if contract already exists
                 existing_contract = session.query(Contract).filter_by(contract_id=contract["contract_id"]).first()
 
-                if not existing_contract:  # If it's new, insert it
+                if not existing_contract:
                     new_contract = Contract(**contract)
                     session.add(new_contract)
                     inserted_count += 1
                 else:
-                    duplicate_count += 1  # Count duplicate contracts
+                    duplicate_count += 1
 
-            session.commit()  # Ensure all changes are committed
+            session.commit()
             print(f"Inserted {inserted_count} new contracts into PostgreSQL.")
             print(f"Skipped {duplicate_count} duplicate contracts.")
             print(f"Skipped {skipped_count} contracts due to missing data.")
 
-            # ✅ Check total contracts in DB
-            count_query = session.execute(text("SELECT COUNT(*) FROM contracts;"))
-            count_result = count_query.fetchone()
-            print(f"Total contracts in DB: {count_result[0]}")
-
         except Exception as e:
-            session.rollback()  # Rollback if an error occurs
+            session.rollback()
             print(f"Error saving to DB: {e}")
 
 if __name__ == "__main__":
-    years = list(range(2015, 2024))  # Fetch data from 2015-2023
-    for year in years:
-        print(f"Fetching contracts for {year}...")
-        contracts_list = fetch_contracts(year)
-        if contracts_list:  # Fix: Check if list is non-empty
-            print(f"{len(contracts_list)} contracts ready to be saved for {year}")
-            save_to_db(contracts_list)
+    while True:
+        existing_count = get_contract_count(YEAR)
+        needed_contracts = TARGET_CONTRACTS - existing_count
+
+        if needed_contracts > 0:
+            print(f"Fetching additional contracts for {YEAR}, need {needed_contracts} more...")
+            contracts_list = fetch_contracts(YEAR, needed_contracts)
+
+            if contracts_list:
+                print(f"{len(contracts_list)} new contracts ready to be saved for {YEAR}")
+                save_to_db(contracts_list)
+            else:
+                print(f"No new contracts found for {YEAR}, retrying...")
+            
+            time.sleep(10)  # Wait before next attempt to avoid API rate limits
+
+        else:
+            print(f"{YEAR} has reached {existing_count} contracts. Fetching complete!")
+            break

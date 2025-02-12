@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float
+from sqlalchemy import create_engine, Column, Integer, String, Float, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import psycopg2
@@ -15,7 +15,7 @@ def create_database():
     exists = cur.fetchone()
     if not exists:
         cur.execute("CREATE DATABASE gov_contracts")
-        print("✅ Database 'gov_contracts' created!")
+        print("Database 'gov_contracts' created!")
     cur.close()
     conn.close()
 
@@ -30,11 +30,22 @@ Base = declarative_base()
 class Contract(Base):
     __tablename__ = "contracts"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    contract_id = Column(String, unique=True)
-    vendor = Column(String)
-    award_amount = Column(Float)
-    agency = Column(String)
+    id = Column(Integer, primary_key=True, index=True)
+    contract_id = Column(String(50), unique=True, index=True, nullable=False)
+    vendor = Column(String(255), nullable=True)
+    award_amount = Column(Float, nullable=False)
+    total_outlays = Column(Float, nullable=True)  
+    covid_obligations = Column(Float, nullable=True)  
+    agency = Column(String(255), nullable=False)
+    awarding_sub_agency = Column(String(255), nullable=True)  
+    funding_agency = Column(String(255), nullable=True)
+    funding_sub_agency = Column(String(255), nullable=True)  
+    start_date = Column(Date, nullable=True)
+    end_date = Column(Date, nullable=True)
+    place_of_performance = Column(String(100), nullable=True)
+    contract_category = Column(String(50), nullable=True)
+    naics_code = Column(String(50), nullable=True)  
+    psc_code = Column(String(50), nullable=True)
 
 # Create Table
 Base.metadata.create_all(engine)
