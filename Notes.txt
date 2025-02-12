@@ -1,0 +1,9 @@
+open postgres db
+psql -U kol -d gov_contracts
+\dt     list tables
+SELECT * FROM contracts LIMIT 10;    view data
+/Applications/pgAdmin\ 4.app    view with app open 
+\dt
+SELECT * FROM contracts LIMIT 10
+
+

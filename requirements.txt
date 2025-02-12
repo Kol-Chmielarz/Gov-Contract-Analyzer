@@ -1,0 +1,10 @@
+pip install fastapi uvicorn requests beautifulsoup4 pandas scikit-learn sqlalchemy psycopg2
+pip install zeep pandas
+pip install sqlalchemy psycopg2
+brew install postgresql
+brew services start postgresql
+brew install --cask pgadmin4
+
+USA_SPENDING_API_URL = "https://api.usaspending.gov/api/v2/search/spending_by_award/"
+is the opensource API for USAspending.gov
+using REST API with POST requests
