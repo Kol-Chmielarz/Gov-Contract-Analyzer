@@ -1,4 +1,3 @@
-#reruns the year until the target amount is reached in postgres
 import requests
 import pandas as pd
 import time
@@ -7,9 +6,12 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import text
 from database import SessionLocal, Contract
 
-# 🔽 Change this to fetch contracts for a specific year
-YEAR = 2018 
-TARGET_CONTRACTS = 1800  # Minimum number of contracts we want per year
+# 🎯 **Target number of contracts per year**
+TARGET_CONTRACTS = 2600  
+
+# 📆 **Start and end year range**
+START_YEAR = 2015  
+END_YEAR = 2024  
 
 USA_SPENDING_API_URL = "https://api.usaspending.gov/api/v2/search/spending_by_award/"
 
@@ -31,7 +33,7 @@ def fetch_contracts(year, needed_contracts):
 
     while needed_contracts > 0:
         month = random.randint(1, 12)  # Pick a random month
-        page = random.randint(1, 500)  # Pick a random page for variation
+        page = random.randint(1, 500)  # Randomize page numbers
 
         start_date = f"{year}-{month:02d}-01"
         end_date = f"{year}-{month:02d}-28" if month == 2 else f"{year}-{month:02d}-30"
@@ -50,7 +52,7 @@ def fetch_contracts(year, needed_contracts):
                 "NAICS Code", "PSC Code", "Total Outlays", "COVID-19 Obligations",
                 "Awarding Sub Agency", "Funding Sub Agency"
             ],
-            "limit": min(needed_contracts, 100),  # Fetch only what's needed up to 100
+            "limit": min(needed_contracts, 100),  # Fetch only up to what's needed
             "page": page  # Fetch from a random page
         }
 
@@ -96,7 +98,7 @@ def fetch_contracts(year, needed_contracts):
                 df = pd.DataFrame(monthly_contracts)
                 df = df.drop_duplicates(subset=["contract_id"])
 
-                print(f"{len(df)} unique contracts fetched for {year}-{month:02d} (page {page})")
+                print(f"✅ {len(df)} unique contracts fetched for {year}-{month:02d} (page {page})")
 
                 contracts.extend(df.to_dict(orient="records"))  
                 needed_contracts -= len(df)  # Reduce the remaining needed count
@@ -109,7 +111,7 @@ def fetch_contracts(year, needed_contracts):
                 retries += 1
 
             except requests.exceptions.RequestException as e:
-                print(f"Network error: {e} (attempt {retries + 1}/{max_retries})")
+                print(f"⚠️ Network error: {e} (attempt {retries + 1}/{max_retries})")
                 time.sleep(initial_delay * (2 ** retries))
                 retries += 1
 
@@ -159,22 +161,23 @@ def save_to_db(contracts):
             print(f"Error saving to DB: {e}")
 
 if __name__ == "__main__":
-    while True:
-        existing_count = get_contract_count(YEAR)
-        needed_contracts = TARGET_CONTRACTS - existing_count
+    for year in range(START_YEAR, END_YEAR + 1):
+        while True:
+            existing_count = get_contract_count(year)
+            needed_contracts = TARGET_CONTRACTS - existing_count
 
-        if needed_contracts > 0:
-            print(f"Fetching additional contracts for {YEAR}, need {needed_contracts} more...")
-            contracts_list = fetch_contracts(YEAR, needed_contracts)
+            if needed_contracts > 100:
+                print(f"🚀 Fetching additional contracts for {year}, need {needed_contracts} more...")
+                contracts_list = fetch_contracts(year, needed_contracts)
 
-            if contracts_list:
-                print(f"{len(contracts_list)} new contracts ready to be saved for {YEAR}")
-                save_to_db(contracts_list)
+                if contracts_list:
+                    print(f"{len(contracts_list)} new contracts ready to be saved for {year}")
+                    save_to_db(contracts_list)
+                else:
+                    print(f"No new contracts found for {year}, retrying...")
+                
+                time.sleep(10)  # 🕒 Wait before next attempt to avoid API rate limits
+
             else:
-                print(f"No new contracts found for {YEAR}, retrying...")
-            
-            time.sleep(10)  # Wait before next attempt to avoid API rate limits
-
-        else:
-            print(f"{YEAR} has reached {existing_count} contracts. Fetching complete!")
-            break
+                print(f"{year} has reached {existing_count} contracts. Moving to next year!")
+                break  # Move to the next year
