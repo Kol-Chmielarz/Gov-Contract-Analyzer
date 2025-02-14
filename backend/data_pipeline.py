@@ -84,7 +84,7 @@ def fetch_contracts(year):
 
                 print(f"{len(df)} unique contracts fetched for {year}-{month:02d}")
 
-                contracts.extend(df.to_dict(orient="records"))  # ✅ Append filtered contracts
+                contracts.extend(df.to_dict(orient="records"))  # Append filtered contracts
                 break  # Exit retry loop if successful
 
             except requests.exceptions.ReadTimeout:
@@ -142,7 +142,7 @@ def save_to_db(contracts):
             print(f"Skipped {duplicate_count} duplicate contracts.")
             print(f"Skipped {skipped_count} contracts due to missing data.")
 
-            # ✅ Check total contracts in DB
+            # Check total contracts in DB
             count_query = session.execute(text("SELECT COUNT(*) FROM contracts;"))
             count_result = count_query.fetchone()
             print(f"Total contracts in DB: {count_result[0]}")

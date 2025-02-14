@@ -7,7 +7,7 @@ from sqlalchemy.sql import text
 from database import SessionLocal, Contract
 
 # 🎯 **Target number of contracts per year**
-TARGET_CONTRACTS = 2600  
+TARGET_CONTRACTS = 12000
 
 # 📆 **Start and end year range**
 START_YEAR = 2015  
@@ -161,12 +161,12 @@ def save_to_db(contracts):
             print(f"Error saving to DB: {e}")
 
 if __name__ == "__main__":
-    for year in range(START_YEAR, END_YEAR + 1):
+    for year in range(END_YEAR, START_YEAR - 1, -1):  # Reverse order (2024 → 2015)
         while True:
             existing_count = get_contract_count(year)
             needed_contracts = TARGET_CONTRACTS - existing_count
 
-            if needed_contracts > 100:
+            if needed_contracts > 1000:
                 print(f"🚀 Fetching additional contracts for {year}, need {needed_contracts} more...")
                 contracts_list = fetch_contracts(year, needed_contracts)
 
