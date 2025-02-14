@@ -57,7 +57,11 @@ export default function Home() {
       {selectedTab === "location-category" && (
         <section className="mt-10 px-6 flex flex-col items-center">
           <h2 className="text-2xl font-bold text-center mb-6">🌍 Location & Contract Share</h2>
-          <LocationCategoryTrends />
+          
+          {/* ✅ Increased Container Size for Full Chart Visibility */}
+          <div className="w-full flex flex-col items-center justify-center max-w-7xl">
+            <LocationCategoryTrends />
+          </div>
         </section>
       )}
 

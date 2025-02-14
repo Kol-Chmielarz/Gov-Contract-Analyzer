@@ -9,11 +9,12 @@ import {
   BarElement,
   ArcElement,
   Tooltip,
-  Legend
+  Legend,
 } from "chart.js";
 
+// Register Chart.js components
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend);
-ChartJS.defaults.color = "#ffffff"; // Ensures text is white on a dark background
+ChartJS.defaults.color = "#ffffff"; // Set all text to white for dark backgrounds
 
 interface PlacePerformance {
   place_of_performance: string;
@@ -41,7 +42,6 @@ export default function LocationCategoryTrends() {
 
     axios.get("http://127.0.0.1:8000/api/contracts/category-breakdown")
       .then(response => {
-        // Filter out unwanted category 
         const filteredData = response.data.filter(
           (item: ContractCategory) => item.contract_category !== "DO" && item.contract_category !== "DCA" && item.contract_category !== "PO" && item.contract_category !== "BPA"
         );
@@ -50,7 +50,7 @@ export default function LocationCategoryTrends() {
       .catch(error => console.error("Error fetching contract categories:", error));
   }, []);
 
-  // Prepare Bar Chart Data 
+  // ✅ Prepare Bar Chart Data 
   const barData = {
     labels: placeData.map(d => d.place_of_performance),
     datasets: [
@@ -66,7 +66,43 @@ export default function LocationCategoryTrends() {
     ],
   };
 
-  // Prepare Pie Chart Data 
+  // ✅ Ensure all labels are displayed properly
+  const barOptions = {
+    indexAxis: "y" as const,
+    responsive: true,
+    maintainAspectRatio: false, // Prevents auto-shrinking
+    scales: {
+      y: {
+        ticks: {
+          autoSkip: false,  // ✅ Prevent Chart.js from skipping labels
+          maxTicksLimit: 10, // ✅ Ensure all 10 states are labeled
+          font: {
+            size: 14, // ✅ Improve readability
+          },
+        },
+      },
+    },
+    plugins: {
+      legend: {
+        labels: {
+          color: "#ffffff", // Ensure white text for dark mode
+          font: {
+            size: 16, // Improve legend readability
+          },
+        },
+      },
+      tooltip: {
+        callbacks: {
+          label: function (tooltipItem: any) {
+            const value = tooltipItem.raw;
+            return `Contract Share: ${value.toFixed(2)}%`;
+          },
+        },
+      },
+    },
+  };
+
+  // ✅ Prepare Pie Chart Data
   const pieData = {
     labels: categoryData.map(d => d.contract_category),
     datasets: [
@@ -99,14 +135,16 @@ export default function LocationCategoryTrends() {
   return (
     <div className="text-white p-8">
       {/* Section Title */}
-
+     
 
       {/* Flex Container: Bar on the left, Pie on the right (on medium+ screens) */}
       <div className="flex flex-wrap md:flex-nowrap gap-6 justify-center items-start">
         {/* Left: Top 10 Locations by Contract Share (%) */}
         <div className="w-full md:w-1/2">
           <h3 className="text-lg font-semibold mb-4 text-center">📍 Top States by Contract Share (%)</h3>
-          <Bar data={barData} options={{ indexAxis: "y" }} />
+          <div className="w-full max-w-4xl h-[500px]"> {/* ✅ Increase height for better spacing */}
+            <Bar data={barData} options={barOptions} />
+          </div>
         </div>
 
         {/* Right: Contract Category Breakdown (%) */}
