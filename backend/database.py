@@ -1,10 +1,13 @@
+from dotenv import load_dotenv
+import os
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
 from sqlalchemy import create_engine, Column, Integer, String, Float, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import psycopg2
-
-# PostgreSQL Connection String
-DATABASE_URL = "postgresql://kol:Z0ethed0g!@localhost/gov_contracts"
 
 # Create the database if it doesn't exist
 def create_database():
